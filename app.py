@@ -19,9 +19,12 @@ st.set_page_config(
 # Custom CSS for aesthetics
 st.markdown("""
 <style>
-    /* 全体の背景色 */
+    /* 全体の背景色とパターン */
     .stApp {
         background-color: #FFF0F5; /* Lavender Blush */
+        background-image: url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='15' y='45' font-family='Segoe UI Emoji' font-size='35' opacity='0.15'%3E🎤%3C/text%3E%3Ctext x='75' y='105' font-family='Segoe UI Emoji' font-size='35' opacity='0.15'%3E📝%3C/text%3E%3Cpath d='M60 15 Q80 5 95 25 T 125 45' stroke='%235D4037' stroke-width='1.5' fill='none' opacity='0.1'/%3E%3Cpath d='M-5 75 Q15 65 30 85' stroke='%235D4037' stroke-width='1.5' fill='none' opacity='0.1'/%3E%3C/svg%3E");
+        background-attachment: fixed;
+        background-size: 120px 120px;
     }
     
     /* サイドバーの背景色 */
