@@ -1,48 +1,98 @@
-import os
-import sys
-import time
-import tempfile
-import whisper
-import torch
-import streamlit as st
-from datetime import datetime
+
+import pyperclip
 
 # ページ設定
 st.set_page_config(
     page_title="Whisper文字起こしツール",
-    page_icon="🎤",
+    page_icon="�",
     layout="wide"
 )
 
 # Custom CSS for aesthetics
 st.markdown("""
 <style>
-    .main {
-        background-color: #f0f2f6; 
+    /* 全体の背景色 */
+    .stApp {
+        background-color: #FFF0F5; /* Lavender Blush */
     }
+    
+    /* サイドバーの背景色 */
+    [data-testid="stSidebar"] {
+        background-color: #FFE4E1; /* Misty Rose */
+    }
+
+    /* テキストカラー */
+    h1, h2, h3, .stMarkdown, p, li {
+        color: #5D4037 !important; /* Soft Brown */
+        font-family: 'Helvetica Neue', sans-serif;
+    }
+
+    /* メインボタンのデザイン */
     .stButton>button {
-        color: white;
-        background-color: #ff4b4b; /* Streamlit red */
-        border-radius: 10px;
-        height: 3em;
+        color: #FFFFFF !important;
+        background-color: #FFB7B2 !important; /* Pastel Pink */
+        border: none;
+        border-radius: 25px;
+        height: 3.5em;
         width: 100%;
         font-weight: bold;
+        font-size: 16px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 10px rgba(255, 183, 178, 0.4);
     }
     .stButton>button:hover {
-        background-color: #ff3333;
-        border-color: #ff3333;
+        background-color: #FF9E9E !important;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(255, 158, 158, 0.5);
     }
+    
+    /* ダウンロードボタンなどのセカンダリボタン */
+    [kind="secondary"] {
+        background-color: #FFFFFF !important;
+        color: #FFB7B2 !important;
+        border: 2px solid #FFB7B2 !important;
+        border-radius: 25px;
+    }
+
+    /* ファイルアップローダー */
+    [data-testid="stFileUploader"] section {
+        background-color: #FFFFFF;
+        border-radius: 20px;
+        padding: 30px;
+        border: 2px dashed #FFB7B2;
+    }
+
+    /* タイトル装飾 */
     h1 {
-        color: #1e1e1e;
         text-align: center;
         padding-bottom: 20px;
-        border-bottom: 2px solid #ff4b4b;
+        border-bottom: 3px dotted #FFB7B2;
+        margin-bottom: 30px;
     }
+
+    /* アラートやインフォメーション */
     .stAlert {
-        border-radius: 10px;
+        background-color: #FFFFFF;
+        border-radius: 15px;
+        border: 1px solid #FFDAC1;
     }
-    .css-1d391kg {
-        padding-top: 3rem;
+    
+    /* タブのデザイン */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: #FFFFFF;
+        border-radius: 20px 20px 0 0;
+        color: #5D4037;
+        padding: 10px 20px;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #FFF0F5;
+        border-bottom: 2px solid #FFB7B2;
+        color: #FFB7B2;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -66,11 +116,11 @@ def get_available_models():
 
 def main():
     """メイン関数"""
-    st.title("🎤 Whisper 文字起こしツール")
+    st.title("Whisper 文字起こしツール")
     st.markdown("""
-    <div style='text-align: center; margin-bottom: 30px;'>
-        OpenAIのWhisperモデルを使用して、音声・動画ファイルからテキストへの文字起こしを行います。<br>
-        MP4, MP3, WAV, M4A, OGG, FLAC に対応しています。
+    <div style='text-align: center; margin-bottom: 30px; color: #5D4037;'>
+        音声・動画ファイルからテキストへの文字起こしを行います。<br>
+        MP4, MP3, WAV, M4A, OGG, FLAC に対応。
     </div>
     """, unsafe_allow_html=True)
 
@@ -123,7 +173,7 @@ def main():
     col1, col2 = st.columns([1, 1])
 
     with col1:
-        st.subheader("📁 ファイルアップロード")
+        st.subheader("ファイルアップロード")
         # ファイルアップロード (Added mp4 and mov)
         uploaded_file = st.file_uploader(
             "音声/動画ファイルをドラッグ＆ドロップ", 
@@ -135,7 +185,7 @@ def main():
         file_ext = uploaded_file.name.split('.')[-1].lower()
         
         with col2:
-            st.subheader("🎧 プレビュー")
+            st.subheader("プレビュー")
             # ファイル情報表示
             file_size_mb = uploaded_file.size / (1024 * 1024)
             st.info(f"ファイル名: {uploaded_file.name}\nサイズ: {file_size_mb:.2f} MB")
@@ -186,7 +236,15 @@ def main():
                     tab1, tab2, tab3 = st.tabs(["📄 テキスト全文", "⏱️ タイムスタンプ詳細", "📥 ダウンロード"])
                     
                     with tab1:
-                        st.text_area("文字起こし結果", value=result["text"], height=300)
+                        st.text_area("文字起こし結果", value=result["text"], height=300, key="transcript_text")
+                        
+                        # Copy button using Pyperclip (server-side/local)
+                        if st.button("📋 クリップボードにコピー", key="copy_btn"):
+                            try:
+                                pyperclip.copy(result["text"])
+                                st.success("✅ コピーしました！")
+                            except Exception as e:
+                                st.error(f"コピーに失敗しました: {e}")
                     
                     with tab2:
                         # テーブル表示用のデータ準備
