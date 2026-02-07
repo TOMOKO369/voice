@@ -1,4 +1,3 @@
-
 import os
 import sys
 import time
@@ -8,6 +7,7 @@ import torch
 import streamlit as st
 from datetime import datetime
 import pyperclip
+from st_copy_to_clipboard import st_copy_to_clipboard
 
 # ページ設定
 st.set_page_config(
@@ -264,13 +264,8 @@ def main():
                 col_btn1, col_btn2 = st.columns(2)
                 
                 with col_btn1:
-                    # Copy button using Pyperclip (server-side/local)
-                    if st.button("📋 クリップボードにコピー", key="copy_btn"):
-                        try:
-                            pyperclip.copy(st.session_state.result_text)
-                            st.success("✅ コピーしました！")
-                        except Exception as e:
-                            st.error(f"コピーに失敗しました: {e}")
+                    # JavaScript-based Copy Button
+                    st_copy_to_clipboard(st.session_state.result_text, "📋 クリップボードにコピー", "✅ コピーしました！")
                 
                 with col_btn2:
                      # Clear button
