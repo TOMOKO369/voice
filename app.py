@@ -1,4 +1,12 @@
 
+import os
+import sys
+import time
+import tempfile
+import whisper
+import torch
+import streamlit as st
+from datetime import datetime
 import pyperclip
 
 # ページ設定
