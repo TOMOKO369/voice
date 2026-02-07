@@ -237,66 +237,12 @@ def main():
                     transcribe_time = time.time() - transcribe_start
                     total_time = time.time() - start_time
 
-                    # 結果表示
-                    st.success(f"✅ 処理完了！ (モデルロード: {model_load_time:.2f}秒, 文字起こし: {transcribe_time:.2f}秒, 合計: {total_time:.2f}秒)")
-                    
-                    # タブで表示切り替え
-                    tab1, tab2, tab3 = st.tabs(["📄 テキスト全文", "⏱️ タイムスタンプ詳細", "📥 ダウンロード"])
-                    
-                    with tab1:
-                        st.text_area("文字起こし結果", value=result["text"], height=300, key="transcript_text")
-                        
-                        # Copy button using Pyperclip (server-side/local)
-                        if st.button("📋 クリップボードにコピー", key="copy_btn"):
-                            try:
-                                pyperclip.copy(result["text"])
-                                st.success("✅ コピーしました！")
-                            except Exception as e:
-                                st.error(f"コピーに失敗しました: {e}")
-                    
-                    with tab2:
-                        # テーブル表示用のデータ準備
-                        table_data = []
-                        timestamp_text = ""
-                        for segment in result["segments"]:
-                            start = segment["start"]
-                            end = segment["end"]
-                            text = segment["text"]
-                            
-                            # 時間をフォーマット (HH:MM:SS)
-                            def format_timestamp(seconds):
-                                m, s = divmod(seconds, 60)
-                                h, m = divmod(m, 60)
-                                return f"{int(h):02d}:{int(m):02d}:{s:06.3f}"
-                            
-                            start_fmt = format_timestamp(start)
-                            end_fmt = format_timestamp(end)
-                            
-                            table_data.append({
-                                "開始": start_fmt,
-                                "終了": end_fmt,
-                                "テキスト": text
-                            })
-                            timestamp_text += f"[{start_fmt} --> {end_fmt}] {text}\n"
-                        
-                        st.dataframe(table_data, use_container_width=True)
+                    # 結果をsession_stateに保存
+                    st.session_state.result_text = result["text"]
+                    st.session_state.segments = result["segments"]
+                    st.session_state.uploaded_filename = uploaded_file.name
 
-                    with tab3:
-                        col_d1, col_d2 = st.columns(2)
-                        with col_d1:
-                            st.download_button(
-                                label="📄 テキストのみダウンロード",
-                                data=result["text"],
-                                file_name=f"{os.path.splitext(uploaded_file.name)[0]}_transcript.txt",
-                                mime="text/plain"
-                            )
-                        with col_d2:
-                            st.download_button(
-                                label="⏱️ タイムスタンプ付きダウンロード",
-                                data=timestamp_text,
-                                file_name=f"{os.path.splitext(uploaded_file.name)[0]}_transcript_timestamps.txt",
-                                mime="text/plain"
-                            )
+                    st.success(f"✅ 処理完了！ (モデルロード: {model_load_time:.2f}秒, 文字起こし: {transcribe_time:.2f}秒, 合計: {total_time:.2f}秒)")
 
                 except Exception as e:
                     st.error(f"❌ エラーが発生しました: {str(e)}")
@@ -305,6 +251,92 @@ def main():
                     # 一時ファイルの削除
                     if os.path.exists(temp_filename):
                         os.unlink(temp_filename)
+
+        # 文字起こし結果の表示 (session_stateに保存された内容を表示)
+        if "result_text" in st.session_state and st.session_state.result_text:
+            
+            # タブで表示切り替え
+            tab1, tab2, tab3 = st.tabs(["📄 テキスト全文", "⏱️ タイムスタンプ詳細", "📥 ダウンロード"])
+            
+            with tab1:
+                st.text_area("文字起こし結果", value=st.session_state.result_text, height=300, key="transcript_text_display")
+                
+                col_btn1, col_btn2 = st.columns(2)
+                
+                with col_btn1:
+                    # Copy button using Pyperclip (server-side/local)
+                    if st.button("📋 クリップボードにコピー", key="copy_btn"):
+                        try:
+                            pyperclip.copy(st.session_state.result_text)
+                            st.success("✅ コピーしました！")
+                        except Exception as e:
+                            st.error(f"コピーに失敗しました: {e}")
+                
+                with col_btn2:
+                     # Clear button
+                    if st.button("🗑️ 結果をクリア", key="clear_btn"):
+                        st.session_state.result_text = ""
+                        st.session_state.segments = []
+                        st.rerun()
+
+            with tab2:
+                # テーブル表示用のデータ準備
+                table_data = []
+                timestamp_text = ""
+                for segment in st.session_state.segments:
+                    start = segment["start"]
+                    end = segment["end"]
+                    text = segment["text"]
+                    
+                    # 時間をフォーマット (HH:MM:SS)
+                    def format_timestamp(seconds):
+                        m, s = divmod(seconds, 60)
+                        h, m = divmod(m, 60)
+                        return f"{int(h):02d}:{int(m):02d}:{s:06.3f}"
+                    
+                    start_fmt = format_timestamp(start)
+                    end_fmt = format_timestamp(end)
+                    
+                    table_data.append({
+                        "開始": start_fmt,
+                        "終了": end_fmt,
+                        "テキスト": text
+                    })
+                    timestamp_text += f"[{start_fmt} --> {end_fmt}] {text}\n"
+                
+                st.dataframe(table_data, use_container_width=True)
+
+            with tab3:
+                col_d1, col_d2 = st.columns(2)
+                
+                # タイムスタンプテキストの生成（ダウンロード用）
+                ts_full_text = ""
+                for segment in st.session_state.segments:
+                    # 再度生成（tab2のスコープ外のため）
+                    m_s, s_s = divmod(segment["start"], 60)
+                    h_s, m_s = divmod(m_s, 60)
+                    start_fmt = f"{int(h_s):02d}:{int(m_s):02d}:{s_s:06.3f}"
+                    
+                    m_e, s_e = divmod(segment["end"], 60)
+                    h_e, m_e = divmod(m_e, 60)
+                    end_fmt = f"{int(h_e):02d}:{int(m_e):02d}:{s_e:06.3f}"
+                    
+                    ts_full_text += f"[{start_fmt} --> {end_fmt}] {segment['text']}\n"
+
+                with col_d1:
+                    st.download_button(
+                        label="📄 テキストのみダウンロード",
+                        data=st.session_state.result_text,
+                        file_name=f"{os.path.splitext(st.session_state.get('uploaded_filename', 'transcript'))[0]}_transcript.txt",
+                        mime="text/plain"
+                    )
+                with col_d2:
+                    st.download_button(
+                        label="⏱️ タイムスタンプ付きダウンロード",
+                        data=ts_full_text,
+                        file_name=f"{os.path.splitext(st.session_state.get('uploaded_filename', 'transcript'))[0]}_transcript_timestamps.txt",
+                        mime="text/plain"
+                    )
                         
     else:
         # ファイルがアップロードされていない場合の案内
