@@ -226,6 +226,9 @@ def main():
                     model = load_whisper_model(model_option)
                     model_load_time = time.time() - start_time
                     
+                    # Windowsのファイルロック/同期のタイミング問題を回避するために少し待機
+                    time.sleep(0.5)
+
                     # 文字起こし処理
                     transcribe_start = time.time()
                     
@@ -234,9 +237,21 @@ def main():
                     if language_option:
                         options["language"] = language_option
                     
-                    # 文字起こし実行
-                    # fp16=False: CPU実行時のエラー回避と安定性向上
-                    result = model.transcribe(temp_filename, **options, fp16=False)
+                    # 文字起こし実行 (リトライロジック付き)
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            # fp16=False: CPU実行時のエラー回避と安定性向上
+                            result = model.transcribe(temp_filename, **options, fp16=False)
+                            break # 成功したらループを抜ける
+                        except PermissionError:
+                            if attempt < max_retries - 1:
+                                time.sleep(1.0) # 待機して再試行
+                                continue
+                            else:
+                                raise # リトライ上限に達したらエラーを投げる
+                        except Exception as e:
+                            raise e # その他のエラーはそのまま投げる
                     
                     transcribe_time = time.time() - transcribe_start
                     total_time = time.time() - start_time
@@ -258,6 +273,9 @@ def main():
                         3. ファイルが破損していないか確認してください。
                         """)
                     st.error(f"詳細エラー: {error_msg}")
+                
+                except PermissionError:
+                     st.error("❌ ファイルへのアクセスが拒否されました。他のプログラムがファイルを使用しているか、セキュリティソフトが干渉している可能性があります。")
 
                 except Exception as e:
                     st.error(f"❌ エラーが発生しました: {str(e)}")
