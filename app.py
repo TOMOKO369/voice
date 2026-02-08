@@ -7,7 +7,7 @@ import torch
 import streamlit as st
 from datetime import datetime
 import pyperclip
-from st_copy_to_clipboard import st_copy_to_clipboard
+# from st_copy_to_clipboard import st_copy_to_clipboard
 
 # ページ設定
 st.set_page_config(
@@ -235,7 +235,8 @@ def main():
                         options["language"] = language_option
                     
                     # 文字起こし実行
-                    result = model.transcribe(temp_filename, **options)
+                    # fp16=False: CPU実行時のエラー回避と安定性向上
+                    result = model.transcribe(temp_filename, **options, fp16=False)
                     
                     transcribe_time = time.time() - transcribe_start
                     total_time = time.time() - start_time
@@ -246,6 +247,17 @@ def main():
                     st.session_state.uploaded_filename = uploaded_file.name
 
                     st.success(f"✅ 処理完了！ (モデルロード: {model_load_time:.2f}秒, 文字起こし: {transcribe_time:.2f}秒, 合計: {total_time:.2f}秒)")
+
+                except RuntimeError as e:
+                    error_msg = str(e)
+                    if "tensor of 0 elements" in error_msg or "shape" in error_msg:
+                        st.error("❌ 音声データの読み込みに失敗しました。以下の点を確認してください：")
+                        st.info("""
+                        1. ファイルに音声が含まれているか確認してください。
+                        2. 動画ファイルの場合、音声トラックがあるか確認してください。
+                        3. ファイルが破損していないか確認してください。
+                        """)
+                    st.error(f"詳細エラー: {error_msg}")
 
                 except Exception as e:
                     st.error(f"❌ エラーが発生しました: {str(e)}")
@@ -267,8 +279,13 @@ def main():
                 col_btn1, col_btn2 = st.columns(2)
                 
                 with col_btn1:
-                    # JavaScript-based Copy Button
-                    st_copy_to_clipboard(st.session_state.result_text, "📋 クリップボードにコピー", "✅ コピーしました！")
+                    # Copy button using Pyperclip (server-side/local)
+                    if st.button("📋 クリップボードにコピー", key="copy_btn"):
+                        try:
+                            pyperclip.copy(st.session_state.result_text)
+                            st.success("✅ コピーしました！（PCのクリップボードに保存されました）")
+                        except Exception as e:
+                            st.error(f"コピーに失敗しました: {e}")
                 
                 with col_btn2:
                      # Clear button
