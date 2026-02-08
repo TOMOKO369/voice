@@ -265,7 +265,17 @@ def main():
                 finally:
                     # 一時ファイルの削除
                     if os.path.exists(temp_filename):
-                        os.unlink(temp_filename)
+                        try:
+                            os.unlink(temp_filename)
+                        except PermissionError:
+                            # Windowsではプロセスがファイルを掴んでいる場合があるため、少し待って再試行
+                            time.sleep(1.0)
+                            try:
+                                os.unlink(temp_filename)
+                            except Exception:
+                                pass # 削除できなくても続行
+                        except Exception:
+                            pass
 
         # 文字起こし結果の表示 (session_stateに保存された内容を表示)
         if "result_text" in st.session_state and st.session_state.result_text:
